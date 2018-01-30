@@ -1,0 +1,7 @@
+[prune]
+  non-go = true
+  go-tests = true
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/pivotal-cf/brokerapi"
