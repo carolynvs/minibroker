@@ -1,6 +1,6 @@
 apiVersion: servicecatalog.k8s.io/v1beta1
 kind: ClusterServiceBroker
 metadata:
-  name: incluster
+  name: minibroker
 spec:
-  url: http://broker.default.svc.cluster.local
+  url: http://minibroker.default.svc.cluster.local

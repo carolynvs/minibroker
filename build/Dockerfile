@@ -22,4 +22,4 @@ RUN mv minikube /usr/local/bin/
 # Install svcat
 RUN go get github.com/kubernetes-incubator/service-catalog/cmd/svcat
 
-WORKDIR /go/src/github.com/deis/incluster-broker
+WORKDIR /go/src/github.com/deis/minibroker

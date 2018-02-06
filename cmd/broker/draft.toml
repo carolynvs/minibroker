@@ -1,6 +1,6 @@
 [environments]
   [environments.development]
-    name = "incluster-broker"
+    name = "minibroker"
     namespace = "default"
     wait = false
     watch = false

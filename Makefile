@@ -1,5 +1,5 @@
-PKG = github.com/deis/incluster-broker
-DOCKER_IMG = incluster-broker-build
+PKG = github.com/deis/minibroker
+DOCKER_IMG = minibroker-build
 
 USE_DOCKER ?= true
 
@@ -26,5 +26,5 @@ run: buildimage
 create-cluster:
 	./build/create-cluster.sh
 
-init: buildimage create-cluster
+init: buildimage
 	$(DO) ./build/init.sh

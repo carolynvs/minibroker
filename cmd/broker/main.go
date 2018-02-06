@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 
-	"github.com/deis/incluster-broker/broker"
-	"github.com/deis/incluster-broker/server"
+	"github.com/deis/minibroker/broker"
+	"github.com/deis/minibroker/server"
 )
 
 func main() {
 	fmt.Println("Hi, I'm an in-cluster broker!")
-	inclusterBroker := broker.InClusterBroker{}
-	server.Run(inclusterBroker)
+	minibroker := broker.Minibroker{}
+	server.Run(minibroker)
 }

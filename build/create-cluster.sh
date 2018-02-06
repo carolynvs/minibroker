@@ -13,9 +13,9 @@ if ! type kubectl &> /dev/null; then
 fi
 
 
-minikube start --profile icb --extra-config=apiserver.Authorization.Mode=RBAC
-minikube addons enable registry --profile icb
-minikube addons enable ingress --profile icb
+minikube start --profile minibroker --extra-config=apiserver.Authorization.Mode=RBAC
+minikube addons enable registry --profile minibroker
+minikube addons enable ingress --profile minibroker
 
 kubectl create clusterrolebinding cluster-admin:kube-system \
     --clusterrole=cluster-admin --serviceaccount=kube-system:default

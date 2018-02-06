@@ -1,4 +1,4 @@
-# InCluster Broker
+# Minibroker
 
 This is an implementation of the [Open Service Broker API](https://openservicebrokerapi.org)
 that is suited for local development. Instead of provisioning services
