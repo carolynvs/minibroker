@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Hi, I'm an in-cluster broker!")
+	fmt.Println("Hi, I'm a minibroker!")
 	minibroker := broker.Minibroker{}
 	server.Run(minibroker)
 }
