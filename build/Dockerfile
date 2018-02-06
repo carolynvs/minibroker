@@ -14,10 +14,10 @@ RUN curl -sLO https://azuredraft.blob.core.windows.net/draft/draft-v0.10.0-linux
 RUN tar -zxvf draft-v0.10.0-linux-amd64.tar.gz
 RUN mv linux-amd64/draft /usr/local/bin/
 
-# Install Minikube
-RUN curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-RUN chmod +x minikube
-RUN mv minikube /usr/local/bin/
+# Install kubectl
+RUN curl -sLO https://storage.googleapis.com/kubernetes-release/release/v1.9.2/bin/linux/amd64/kubectl
+RUN chmod +x ./kubectl
+RUN mv ./kubectl /usr/local/bin/kubectl
 
 # Install svcat
 RUN go get github.com/kubernetes-incubator/service-catalog/cmd/svcat
