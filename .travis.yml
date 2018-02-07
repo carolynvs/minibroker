@@ -1,0 +1,6 @@
+language: go
+sudo: required
+go_import_path: github.com/deis/minibroker
+go:
+  - 1.9.x
+script: "make build test"                                

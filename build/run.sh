@@ -2,8 +2,8 @@
 
 set -xeuo pipefail
 
-kubectl apply -f chart/broker.yaml
+helm upgrade --install minibroker charts/minibroker \
+    --namespace kube-system \
+    --set imagePullPolicy=Never
 
-pushd cmd/broker
-trap popd EXIT
-draft up
+#draft up

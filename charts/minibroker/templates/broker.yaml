@@ -3,4 +3,4 @@ kind: ClusterServiceBroker
 metadata:
   name: minibroker
 spec:
-  url: http://minibroker.default.svc.cluster.local
+  url: http://minibroker.{{ .Release.Namespace }}.svc.cluster.local
