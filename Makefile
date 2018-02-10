@@ -1,34 +1,37 @@
 # If the USE_SUDO_FOR_DOCKER env var is set, prefix docker commands with 'sudo'
 ifdef USE_SUDO_FOR_DOCKER
-	SUDO_CMD = sudo
+  SUDO_CMD = sudo
 endif
 
-IMAGE ?= quay.io/osb-starter-pack/servicebroker
+REPO ?= github.com/carolynvs/osb-starter-pack
+BINARY ?= servicebroker
+PKG ?= $(REPO)/cmd/$(BINARY)
+IMAGE ?= carolynvs/osb-starter-pack
 TAG ?= $(shell git describe --tags --always)
 PULL ?= IfNotPresent
 
 build:
-	go build -i github.com/pmorie/osb-starter-pack/cmd/servicebroker
+	go build -i $(PKG)
 
 test:
 	go test -v $(shell go list ./... | grep -v /vendor/ | grep -v /test/)
 
 linux:
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
-	go build -o servicebroker-linux --ldflags="-s" github.com/pmorie/osb-starter-pack/cmd/servicebroker
+	go build -o $(BINARY)-linux --ldflags="-s" $(PKG)
 
 image: linux
-	cp servicebroker-linux image/servicebroker
+	cp $(BINARY)-linux image/$(BINARY)
 	$(SUDO_CMD) docker build image/ -t "$(IMAGE):$(TAG)"
 
 clean:
-	rm -f servicebroker
+	rm -f $(BINARY)
 
 push: image
 	$(SUDO_CMD) docker push "$(IMAGE):$(TAG)"
 
 deploy-helm: image
-	helm install charts/servicebroker \
+	helm install charts/$(BINARY) \
 	--name broker-skeleton --namespace broker-skeleton \
 	--set image="$(IMAGE):$(TAG)",imagePullPolicy="$(PULL)"
 

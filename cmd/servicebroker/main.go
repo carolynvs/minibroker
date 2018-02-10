@@ -12,9 +12,9 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/pmorie/osb-starter-pack/pkg/rest"
-	"github.com/pmorie/osb-starter-pack/pkg/server"
-	"github.com/pmorie/osb-starter-pack/pkg/user"
+	"github.com/carolynvs/osb-starter-pack/pkg/rest"
+	"github.com/carolynvs/osb-starter-pack/pkg/server"
+	"github.com/carolynvs/osb-starter-pack/pkg/user"
 )
 
 var options struct {
