@@ -31,8 +31,8 @@ push: image
 	$(SUDO_CMD) docker push "$(IMAGE):$(TAG)"
 
 deploy-helm: image
-	helm install charts/$(BINARY) \
-	--name broker-skeleton --namespace broker-skeleton \
+	helm upgrade --install broker-skeleton --namespace broker-skeleton \
+	charts/$(BINARY) \
 	--set image="$(IMAGE):$(TAG)",imagePullPolicy="$(PULL)"
 
 deploy-openshift: image
