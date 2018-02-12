@@ -7,8 +7,9 @@ REPO ?= github.com/carolynvs/osb-starter-pack
 BINARY ?= servicebroker
 PKG ?= $(REPO)/cmd/$(BINARY)
 IMAGE ?= carolynvs/osb-starter-pack
-TAG ?= $(shell git describe --tags --always)
-PULL ?= IfNotPresent
+TAG ?= latest
+#$(shell git describe --tags --always)
+PULL ?= Always
 
 build:
 	go build -i $(PKG)
@@ -30,12 +31,12 @@ clean:
 push: image
 	$(SUDO_CMD) docker push "$(IMAGE):$(TAG)"
 
-deploy-helm: image
+deploy-helm: push
 	helm upgrade --install broker-skeleton --namespace broker-skeleton \
-	charts/$(BINARY) \
+	--recreate-pods charts/$(BINARY) \
 	--set image="$(IMAGE):$(TAG)",imagePullPolicy="$(PULL)"
 
-deploy-openshift: image
+deploy-openshift: push
 	oc new-project osb-starter-pack
 	oc process -f openshift/starter-pack.yaml -p IMAGE=$(IMAGE):$(TAG) | oc create -f -
 
