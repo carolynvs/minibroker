@@ -1,13 +1,15 @@
 package user
 
 import (
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"sync"
 
-	"gopkg.in/yaml.v2"
-
-	osb "github.com/pmorie/go-open-service-broker-client/v2"
 	"github.com/carolynvs/osb-starter-pack/pkg/broker"
+	"github.com/pkg/errors"
+	osb "github.com/pmorie/go-open-service-broker-client/v2"
+	"k8s.io/helm/pkg/repo"
 )
 
 // NewBusinessLogic is a hook that is called with the Options the program is run
@@ -32,54 +34,60 @@ type BusinessLogic struct {
 
 var _ broker.BusinessLogic = &BusinessLogic{}
 
-func (b *BusinessLogic) GetCatalog(w http.ResponseWriter, r *http.Request) (*osb.CatalogResponse, error) {
-	// Your catalog business logic goes here
-	response := &osb.CatalogResponse{}
-
-	data := `
----
-services:
-- name: example-starter-pack-service
-  id: 4f6e6cf6-ffdd-425f-a2c7-3c9258ad246a
-  description: The example service from the osb starter pack!
-  bindable: true
-  plan_updateable: true
-  metadata:
-    displayName: "Example starter-pack service"
-    imageUrl: https://avatars2.githubusercontent.com/u/19862012?s=200&v=4
-  plans:
-  - name: default
-    id: 86064792-7ea2-467b-af93-ac9694d96d5b
-    description: The default plan for the starter pack example service
-    free: true
-    schemas:
-      service_instance:
-        create:
-          "$schema": "http://json-schema.org/draft-04/schema"
-          "type": "object"
-          "title": "Parameters"
-          "properties":
-          - "name":
-              "title": "Some Name"
-              "type": "string"
-              "maxLength": 63
-              "default": "My Name"
-          - "color":
-              "title": "Color"
-              "type": "string"
-              "default": "Clear"
-              "enum":
-              - "Clear"
-              - "Beige"
-              - "Grey"
-`
-
-	err := yaml.Unmarshal([]byte(data), &response)
+func (b *BusinessLogic) GetCatalog(response http.ResponseWriter, request *http.Request) (*osb.CatalogResponse, error) {
+	repoURL := "https://kubernetes-charts.storage.googleapis.com"
+	dlrequest, err := http.Get(repoURL)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Could not download upstream repo index at %s", repoURL)
+	}
+	body, err := ioutil.ReadAll(dlrequest.Body)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not read %s body", repoURL)
 	}
 
-	return response, nil
+	if dlrequest.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("GET %s (%v)\n%s", dlrequest.StatusCode)
+	}
+	indexFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		return nil, errors.Wrap(err, "Could not create temp file for the index")
+	}
+
+	err = ioutil.WriteFile(indexFile.Name(), body, 0666)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not write temp file %s", indexFile.Name())
+	}
+	index, err := repo.LoadIndexFile(indexFile.Name())
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not load helm repository index at %s", indexFile.Name())
+	}
+
+	catalog := &osb.CatalogResponse{
+		Services: make([]osb.Service, 0, len(index.Entries)),
+	}
+
+	for name, versions := range index.Entries {
+		svc := osb.Service{
+			ID:          name,
+			Name:        name,
+			Description: "Helm Chart for " + name,
+			Bindable:    true,
+			Plans:       make([]osb.Plan, 0, len(versions)),
+		}
+		for _, version := range versions {
+			planName := fmt.Sprintf("%s@%s", name, version.AppVersion)
+			plan := osb.Plan{
+				ID:          planName,
+				Name:        planName,
+				Description: version.Description,
+				Free:        boolPtr(true),
+			}
+			svc.Plans = append(svc.Plans, plan)
+		}
+		catalog.Services = append(catalog.Services, svc)
+	}
+
+	return catalog, nil
 }
 
 func (b *BusinessLogic) Provision(pr *osb.ProvisionRequest, w http.ResponseWriter, r *http.Request) (*osb.ProvisionResponse, error) {
@@ -150,4 +158,8 @@ func (b *BusinessLogic) ValidateBrokerAPIVersion(version string) error {
 type exampleInstance struct {
 	ID     string
 	Params map[string]interface{}
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
