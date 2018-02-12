@@ -2,13 +2,18 @@ package user
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"regexp"
+	"strings"
 	"sync"
 
+	"github.com/Masterminds/semver"
 	"github.com/carolynvs/osb-starter-pack/pkg/broker"
 	"github.com/pkg/errors"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
+	"k8s.io/helm/pkg/getter"
+	"k8s.io/helm/pkg/helm/environment"
+	"k8s.io/helm/pkg/helm/helmpath"
 	"k8s.io/helm/pkg/repo"
 )
 
@@ -35,56 +40,101 @@ type BusinessLogic struct {
 var _ broker.BusinessLogic = &BusinessLogic{}
 
 func (b *BusinessLogic) GetCatalog(response http.ResponseWriter, request *http.Request) (*osb.CatalogResponse, error) {
-	repoURL := "https://kubernetes-charts.storage.googleapis.com"
-	dlrequest, err := http.Get(repoURL)
+	stableURL := "https://kubernetes-charts.storage.googleapis.com"
+
+	home := helmpath.Home(environment.DefaultHelmHome)
+	f, err := repo.LoadRepositoriesFile(home.RepositoryFile())
 	if err != nil {
-		return nil, errors.Wrapf(err, "Could not download upstream repo index at %s", repoURL)
-	}
-	body, err := ioutil.ReadAll(dlrequest.Body)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Could not read %s body", repoURL)
+		return nil, err
 	}
 
-	if dlrequest.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("GET %s (%v)\n%s", dlrequest.StatusCode)
-	}
-	indexFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		return nil, errors.Wrap(err, "Could not create temp file for the index")
-	}
-
-	err = ioutil.WriteFile(indexFile.Name(), body, 0666)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Could not write temp file %s", indexFile.Name())
-	}
-	index, err := repo.LoadIndexFile(indexFile.Name())
-	if err != nil {
-		return nil, errors.Wrapf(err, "Could not load helm repository index at %s", indexFile.Name())
+	cif := home.CacheIndex("stable")
+	c := repo.Entry{
+		Name:  "stable",
+		Cache: cif,
+		URL:   stableURL,
 	}
 
-	catalog := &osb.CatalogResponse{
-		Services: make([]osb.Service, 0, len(index.Entries)),
+	var settings environment.EnvSettings
+	r, err := repo.NewChartRepository(&c, getter.All(settings))
+	if err != nil {
+		return nil, err
 	}
 
-	for name, versions := range index.Entries {
-		svc := osb.Service{
-			ID:          name,
-			Name:        name,
-			Description: "Helm Chart for " + name,
-			Bindable:    true,
-			Plans:       make([]osb.Plan, 0, len(versions)),
+	if err := r.DownloadIndexFile(home.Cache()); err != nil {
+		return nil, errors.Wrapf(err, "Looks like %q is not a valid chart repository or cannot be reached", stableURL)
+	}
+
+	f.Update(&c)
+	f.WriteFile(home.RepositoryFile(), 0644)
+
+	// Load the repositories.yaml
+	rf, err := repo.LoadRepositoriesFile(home.RepositoryFile())
+	if err != nil {
+		return nil, err
+	}
+
+	catalog := &osb.CatalogResponse{}
+	for _, re := range rf.Repositories {
+		n := re.Name
+		f := home.CacheIndex(n)
+		index, err := repo.LoadIndexFile(f)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Could not load helm repository index at %s", f)
 		}
-		for _, version := range versions {
-			planName := fmt.Sprintf("%s@%s", name, version.AppVersion)
-			plan := osb.Plan{
-				ID:          planName,
-				Name:        planName,
-				Description: version.Description,
-				Free:        boolPtr(true),
+
+		for name, chartVersions := range index.Entries {
+			svc := osb.Service{
+				ID:          name,
+				Name:        name,
+				Description: "Helm Chart for " + name,
+				Bindable:    true,
+				Plans:       make([]osb.Plan, 0, len(chartVersions)),
 			}
-			svc.Plans = append(svc.Plans, plan)
+			appVersions := map[string]*repo.ChartVersion{}
+			for _, chartVersion := range chartVersions {
+				if chartVersion.AppVersion == "" {
+					continue
+				}
+
+				curV, err := semver.NewVersion(chartVersion.Version)
+				if err != nil {
+					fmt.Printf("Skipping %s@%s because %s is not a valid semver", name, chartVersion.AppVersion, chartVersion.Version)
+					continue
+				}
+
+				currentMax, ok := appVersions[chartVersion.AppVersion]
+				if !ok {
+					appVersions[chartVersion.AppVersion] = chartVersion
+				} else {
+					maxV, _ := semver.NewVersion(currentMax.Version)
+					if curV.GreaterThan(maxV) {
+						appVersions[chartVersion.AppVersion] = chartVersion
+					} else {
+						fmt.Printf("Skipping %s@%s because %s<%s", name, chartVersion.AppVersion, curV, maxV)
+						continue
+					}
+				}
+			}
+
+			for _, chartVersion := range appVersions {
+				planToken := fmt.Sprintf("%s@%s", name, chartVersion.AppVersion)
+				cleaner := regexp.MustCompile(`[^a-z0-9]`)
+				planName := cleaner.ReplaceAllString(strings.ToLower(planToken), "-")
+				plan := osb.Plan{
+					ID:          planName,
+					Name:        planName,
+					Description: fmt.Sprintf("%s - %s", planToken, chartVersion.Description),
+					Free:        boolPtr(true),
+				}
+				svc.Plans = append(svc.Plans, plan)
+			}
+
+			if len(svc.Plans) == 0 {
+				continue
+			}
+			catalog.Services = append(catalog.Services, svc)
 		}
-		catalog.Services = append(catalog.Services, svc)
 	}
 
 	return catalog, nil

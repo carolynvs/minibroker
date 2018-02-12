@@ -27,7 +27,7 @@ spec:
         image: {{ .Values.image }}
         imagePullPolicy: {{ .Values.imagePullPolicy }}
         command:
-        - /opt/servicebroker/servicebroker
+        - servicebroker
         args:
         - --port
         - "8080"
